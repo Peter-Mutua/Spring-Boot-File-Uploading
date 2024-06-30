@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.net.MalformedURLException;
 import java.nio.file.*;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -45,42 +46,90 @@ public class FileServiceImpl implements FileService {
     }
 
     @Override
-    public ResponseEntity<Object> save(MultipartFile file) {
-        log.info("Save file Method called....");
+    public ResponseEntity<Object> save(MultipartFile[] files) {
+        log.info("Save files Method called....");
 
-        String fileName = file.getOriginalFilename();
-        try {
+        List<Object> responses = new ArrayList<>();
+        long maxFileSize = 25 * 1024 * 1024; // 25MB in bytes
 
-            Optional<CompanyFiles> findFile = fileRepository.findByFileNameAndSoftDelete(fileName, false);
+        for (MultipartFile file : files) {
+            String fileName = file.getOriginalFilename();
+            try {
+                if (file.getSize() > maxFileSize) {
+                    responses.add(ResponseHandler.generateResponse("File " + fileName + " exceeds the maximum size of 20MB.", HttpStatus.BAD_REQUEST, null));
+                    continue;
+                }
 
-            if (findFile.isPresent()) {
-                return ResponseHandler.generateResponse("A file with the name " + findFile.get().getFileName() + " already exists!", HttpStatus.FOUND,  null);
+                Optional<CompanyFiles> findFile = fileRepository.findByFileNameAndSoftDelete(fileName, false);
+
+                if (findFile.isPresent()) {
+                    responses.add(ResponseHandler.generateResponse("A file with the name " + findFile.get().getFileName() + " already exists!", HttpStatus.FOUND, null));
+                    continue;
+                }
+
+                assert fileName != null;
+                Path filePath = this.root.resolve(fileName);
+
+                Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+
+                CompanyFiles model = new CompanyFiles();
+                model.setFileLocation(filePath.toString());
+                model.setFileName(file.getOriginalFilename());
+                model.setMetaData(file.getContentType());
+
+                fileRepository.save(model);
+
+                responses.add(ResponseHandler.generateResponse("File " + file.getOriginalFilename() + " uploaded successfully!", HttpStatus.OK, model));
+            } catch (Exception e) {
+                if (e instanceof FileAlreadyExistsException) {
+                    responses.add(ResponseHandler.generateResponse("A file of that name already exists.", HttpStatus.CONFLICT, null));
+                } else {
+                    responses.add(ResponseHandler.generateResponse("An error occurred while uploading the file: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR, null));
+                }
             }
-
-            assert fileName != null;
-            Path filePath = this.root.resolve(fileName);
-
-            Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
-
-            CompanyFiles model = new CompanyFiles();
-//            model.setCompanyId(companyId);
-            model.setFileLocation(filePath.toString());
-            model.setFileName(file.getOriginalFilename());
-            model.setMetaData(file.getContentType());
-//            model.setCreatedBy(createdBy);
-
-            fileRepository.save(model);
-
-            return ResponseHandler.generateResponse("File " +file.getOriginalFilename()+ " uploaded successfully!", HttpStatus.OK, model);
-
-        } catch (Exception e) {
-            if (e instanceof FileAlreadyExistsException) {
-                throw new RuntimeException("A file of that name already exists.");
-            }
-
-            throw new RuntimeException(e.getMessage());
         }
+
+        return ResponseHandler.generateResponse("Files processed.", HttpStatus.OK, responses);
     }
+
+
+    /*Below code uploads only a single file*/
+//    public ResponseEntity<Object> save(MultipartFile file) {
+//        log.info("Save file Method called....");
+//
+//        String fileName = file.getOriginalFilename();
+//        try {
+//
+//            Optional<CompanyFiles> findFile = fileRepository.findByFileNameAndSoftDelete(fileName, false);
+//
+//            if (findFile.isPresent()) {
+//                return ResponseHandler.generateResponse("A file with the name " + findFile.get().getFileName() + " already exists!", HttpStatus.FOUND,  null);
+//            }
+//
+//            assert fileName != null;
+//            Path filePath = this.root.resolve(fileName);
+//
+//            Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+//
+//            CompanyFiles model = new CompanyFiles();
+////            model.setCompanyId(companyId);
+//            model.setFileLocation(filePath.toString());
+//            model.setFileName(file.getOriginalFilename());
+//            model.setMetaData(file.getContentType());
+////            model.setCreatedBy(createdBy);
+//
+//            fileRepository.save(model);
+//
+//            return ResponseHandler.generateResponse("File " +file.getOriginalFilename()+ " uploaded successfully!", HttpStatus.OK, model);
+//
+//        } catch (Exception e) {
+//            if (e instanceof FileAlreadyExistsException) {
+//                throw new RuntimeException("A file of that name already exists.");
+//            }
+//
+//            throw new RuntimeException(e.getMessage());
+//        }
+//    }
 
     @Override
     public ResponseEntity<Object> getAllFiles() {

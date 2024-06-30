@@ -10,7 +10,7 @@ import java.util.stream.Stream;
 public interface FileService {
     public void init();
 
-    public ResponseEntity<Object> save(MultipartFile file);
+    public ResponseEntity<Object> save(MultipartFile[] files);
 
     public ResponseEntity<Object> getAllFiles();
 

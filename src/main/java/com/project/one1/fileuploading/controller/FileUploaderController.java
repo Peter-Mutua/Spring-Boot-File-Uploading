@@ -20,10 +20,10 @@ public class FileUploaderController {
     private FileService fileService;
 
     @PostMapping("/upload")
-    public ResponseEntity<Object> uploadFile(@RequestParam("file") MultipartFile file) {
+    public ResponseEntity<Object> uploadFile(@RequestParam("file") MultipartFile[] files) {
         try {
-            log.info("Uploading file with size: {} bytes.....", file.getSize());
-            return fileService.save(file);
+            log.info("Uploading file with size: {} bytes.....", files.length);
+            return fileService.save(files);
         } catch (Exception e) {
             return ResponseHandler.generateResponse("An error occurred while uploading the file" + e.getMessage(), HttpStatus.BAD_REQUEST, null);
         }
