@@ -38,7 +38,7 @@ public class FileUploaderController {
         }
     }
 
-    @GetMapping("/files/{filename:.+}")
+    @GetMapping("/download/{filename:.+}")
     @ResponseBody
     public ResponseEntity<Resource> getFile(@PathVariable String filename) {
         try {
